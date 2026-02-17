@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs (keep directory, ignore contents)
+*/logs/*
+!*/logs/.gitkeep
+
+# Large checkpoint files (optional - uncomment if you don't want checkpoints in git)
+# */checkpoints/*.pkl
