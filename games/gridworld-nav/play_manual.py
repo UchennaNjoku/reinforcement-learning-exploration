@@ -16,7 +16,6 @@ Usage:
     python play_manual.py --size 12
     python play_manual.py --help
 
-Author: Chenna (CS Senior, Bethune-Cookman University)
 """
 
 from __future__ import annotations
