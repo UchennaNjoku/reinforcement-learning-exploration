@@ -64,7 +64,7 @@ def update_network(q_network, target_network, optimizer, batch, gamma, device):
     a  = torch.tensor(np.array(batch.action),            dtype=torch.int64,   device=device)  # (B,)
     r  = torch.tensor(np.array(batch.reward),            dtype=torch.float32, device=device)  # (B,)
     s2 = torch.tensor(np.array(batch.next_state), dtype=torch.float32, device=device)  # (B,4)
-    d  = torch.tensor(np.array(batch.done),         dtype=torch.float32, device=device)  # (B,) 1 if done else 0
+    d  = torch.tensor(np.array(batch.done),         dtype=torch.bool, device=device)  # (B,) 1 if done else 0
 
     # === PREDICTION (from online network)
     # we first find all q values for each state in our batch
@@ -76,33 +76,74 @@ def update_network(q_network, target_network, optimizer, batch, gamma, device):
     # === TARGET (from target network)
     # target formula -> target [y] is the reward you got + discounted best future q (iff episode not done)
     with torch.no_grad():
-        q_target_all = target_network(s2)
-        max_q_target = torch.max(q_target_all, dim=1).values
+        # IMPROVEMENT --> MIGRATING TO DDQN TO FIX OVERESTIMATION BIAS
+        # q_target_all = target_network(s2)
+        # max_q_target = torch.max(q_target_all, dim=1).values
         
-        y = r + gamma * (1.0 - d) * max_q_target # NB. if done then the target is just the reward
+        # y = r + gamma * (~d).float() * max_q_target # NB. if done then the target is just the reward
+
+        next_q_online = q_network(s2)
+        next_action = torch.argmax(next_q_online, dim=1)
+
+        next_q_target = target_network(s2)
+        next_q = next_q_target.gather(1, next_action.unsqueeze(1)).squeeze(1)
+
+        y = r + gamma * (~d).float() * next_q
 
     # === LOSS 
-    loss = torch.mean((y - q_val_chosen_action) ** 2)
+    # loss = torch.mean((y - q_val_chosen_action) ** 2) # REMOVED IN FAVOUR OF HUBER LOSS
+    loss = nn.functional.smooth_l1_loss(q_val_chosen_action, y)
 
     optimizer.zero_grad() # clear old gradients
     loss.backward() # backprop (for each weight how should it change to reduce loss)
+    torch.nn.utils.clip_grad_norm_(q_network.parameters(), 10.0) ### INTRODUCED GRDIENT CLIPPING 
     optimizer.step() # update weights 
 
     return float(loss.item()) # for logging float if needed
+
+##  === EVALUATE POLICY ============================================
+##  added recently so we can evaluate the efficiency of policy without the 
+##  randomness of epsilon
+def evaluate_policy(q_net, 
+                    env_name="CartPole-v1", 
+                    episodes=10, 
+                    device=None
+):
+    env = gym.make(env_name)
+    if device is None:
+        device = next(q_net.parameters()).device
+    total_rewards_per_eps = []
+    for _ in range(episodes):
+        s, _ = env.reset()
+        done = False
+        total = 0.0
+        while not done:
+            with torch.no_grad():
+                state = torch.tensor(s, dtype=torch.float32, device=device).unsqueeze(0)
+                action = int(q_net(state).argmax(dim=1).item())
+            s, r, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total += r
+        total_rewards_per_eps.append(total)
+    env.close()
+
+    return float(np.mean(total_rewards_per_eps)), float(np.std(total_rewards_per_eps))
+    
+
 
 def train_cartpole_dqn(
         env_name="CartPole-v1",
         seed=0,
         episodes=600,
         gamma=0.99,
-        lr=1e-3,
+        lr=2.5e-4,
         buffer_size=50_000,
         batch_size=64,
-        warmup_steps=1_000,
+        warmup_steps=2_000,
         target_update_every=500,   # steps
         epsilon_start=1.0,
-        epsilon_end=0.05,
-        epsilon_decay_steps=30_000,
+        epsilon_end=0.01,
+        epsilon_decay_steps=10_000,
         max_steps_per_episode=500, 
 ):
     random.seed(seed)
@@ -129,6 +170,7 @@ def train_cartpole_dqn(
 
     num_global_steps = 0 # total environment steps taken across all episode
     total_reward_per_episode = [] 
+    best_eval = 0.0
 
     def epsilon_by_step(t):
         frac = min(1.0, t / epsilon_decay_steps)
@@ -153,11 +195,19 @@ def train_cartpole_dqn(
 
             # TRAIN ONLY AFTER WARMUP STEPS
             if num_global_steps >= warmup_steps and len(replay_buffer) >= batch_size:
+                # for _ in range(2): # ATTEMPTED IMPROVEMENT: two updates per step, extracting more learning from the same experience
                 batch = replay_buffer.sample(batch_size)
                 _loss = update_network(q_net, target_net, optimizer, batch, gamma, device)
 
-                if num_global_steps % target_update_every == 0:
-                    target_net.load_state_dict(q_net.state_dict())
+                # IMPROVEMENT --> use Polyak soft target updat to avoid large jumps in target net
+                # if num_global_steps % target_update_every == 0:
+                #     target_net.load_state_dict(q_net.state_dict())
+
+                tau = 0.005
+                with torch.no_grad():
+                    for target_p, online_p in zip(target_net.parameters(), q_net.parameters()):
+                        target_p.data.mul_(1 - tau)
+                        target_p.data.add_(tau * online_p.data)
 
             if done:
                 break
@@ -167,11 +217,27 @@ def train_cartpole_dqn(
         avg50 = np.mean(recent)
         print(f"Ep {ep:4d} | Return {ep_return:6.1f} | Avg50 {avg50:6.1f} | eps {epsilon_by_step(num_global_steps):.3f}")
 
-        if len(total_reward_per_episode) >= 100 and np.mean(total_reward_per_episode[-100:]) >= 475:
-            print("Solved (avg >= 475 over last 100).")
-            break
+        # IMPROVEMENT --> removed the training end clause as instability causes this to not hit 
+        #                 consistent (epsilon caauses batch poisoning), opted for using the eval to end training
+        # if len(total_reward_per_episode) >= 100 and np.mean(total_reward_per_episode[-100:]) >= 475:
+        #     print("Solved (avg >= 475 over last 100).")
+        #     break
+        if ep % 25 == 0 and ep > 0:
+            mean_eval, std_eval = evaluate_policy(q_net, env_name, episodes=10, device=device)
+            print(f"  [EVAL] mean={mean_eval:.1f} std={std_eval:.1f}")
+            if mean_eval > best_eval:
+                best_eval = mean_eval
+                torch.save(q_net.state_dict(), "cartpole_best.pt")
+                print(f"  [EVAL] New best model saved (mean={mean_eval:.1f})")
+            if mean_eval >= 485:
+                print(f"  Solved! Eval mean={mean_eval:.1f}")
+                break
 
     env.close()
+    # best model is saved
+    if best_eval > 0:
+        q_net.load_state_dict(torch.load("cartpole_best.pt", weights_only=True))
+        print(f"Loaded best model (eval mean={best_eval:.1f})")
     return q_net
 
 # WATCH TRAINED AGENT
