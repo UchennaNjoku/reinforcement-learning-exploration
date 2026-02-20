@@ -27,20 +27,33 @@ reinforcement-learning-exploration/
     │   ├── README.md
     │   ├── train.py
     │   └── checkpoints/
-    └── minigrid-wall-nav/             # Game 2: Custom environment
+    ├── minigrid-wall-nav/             # Game 2: Custom environment
+    │   ├── README.md
+    │   ├── main.py
+    │   ├── train.py
+    │   ├── evaluate.py
+    │   ├── config.py
+    │   ├── utils.py
+    │   ├── agents/                    # 13 agent iterations!
+    │   │   ├── custom_agent.py
+    │   │   ├── custom_agent_11.py     # The breakthrough
+    │   │   └── ...
+    │   ├── envs/
+    │   │   └── random_goal_obstacle_env.py
+    │   └── checkpoints/
+    ├── gridworld-nav/                 # Game 3: Cardinal direction navigation
+    │   ├── README.md
+    │   ├── main.py
+    │   ├── config.py
+    │   ├── envs/
+    │   │   └── grid_world_env.py
+    │   ├── play_manual.py
+    │   └── test_env.py
+    └── cartpole-dqn/                  # Game 4: Deep Q-Networks
         ├── README.md
         ├── main.py
-        ├── train.py
-        ├── evaluate.py
-        ├── config.py
-        ├── utils.py
-        ├── agents/                    # 13 agent iterations!
-        │   ├── custom_agent.py
-        │   ├── custom_agent_11.py     # The breakthrough
-        │   └── ...
-        ├── envs/                      # Custom environment
-        │   └── random_goal_obstacle_env.py
-        └── checkpoints/
+        ├── cartpole_dqn.pt
+        └── cartpole_best.pt
 ```
 
 ## The Journey So Far
@@ -85,6 +98,56 @@ Custom environment with dynamic wall obstacles. The agent must learn to navigate
 
 ---
 
+### Game 3: GridWorld Navigation 🧭
+**Simplifying Movement** | [Go to folder](./games/gridworld-nav/)
+
+A custom Gymnasium environment where the agent navigates using cardinal directions (up/down/left/right) without orientation. Similar to Game 2 but with a simpler movement model.
+
+**Key Differences from Game 2:**
+| Feature | Game 2 (MiniGrid) | Game 3 (GridWorld) |
+|---------|------------------|-------------------|
+| Movement | Orientation-based (turn + forward) | Cardinal directions |
+| Actions | 3 (turn left, turn right, forward) | 4 (up, down, left, right) |
+| State | Position + Direction | Position only |
+| Rendering | MiniGrid viewer | pygame (custom) |
+
+**Key Learnings:**
+- Custom Gymnasium environment creation
+- BFS-based reachability checking
+- pygame-based rendering
+- Simpler action spaces can aid learning
+
+---
+
+### Game 4: CartPole with DQN 🎯
+**The Leap to Deep RL** | [Go to folder](./games/cartpole-dqn/)
+
+Deep Q-Network implementation for CartPole-v1. First foray into neural network-based function approximation for continuous state spaces.
+
+**Key Learnings:**
+- Neural networks as function approximators
+- Experience replay for sample efficiency
+- Target networks for stable training
+- **Double DQN** to fix overestimation bias
+- **Polyak averaging** for smooth target updates
+- **Huber loss** for robust training
+- **Gradient clipping** to prevent explosions
+- **Evaluation-based stopping** (training returns are noisy!)
+
+**Success Rate:** Solved (≥ 485 avg over 10 eval episodes)
+
+**The Improvements:**
+```python
+# DDQN: Online selects, target evaluates
+next_action = torch.argmax(q_network(s2), dim=1)
+next_q = target_network(s2).gather(1, next_action.unsqueeze(1))
+
+# Polyak soft update (τ=0.005)
+target_p.data.mul_(1 - tau).add_(tau * online_p.data)
+```
+
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -119,6 +182,31 @@ python main.py eval
 python main.py manual
 ```
 
+**Game 3 - GridWorld Navigation:**
+```bash
+cd games/gridworld-nav
+
+# Play manually
+python play_manual.py
+
+# Test the environment
+python test_env.py
+```
+
+**Game 4 - CartPole DQN:**
+```bash
+cd games/cartpole-dqn
+
+# Train
+python main.py train --episodes 600 --lr 2.5e-4
+
+# Watch trained agent
+python main.py watch --episodes 5
+
+# Play manually
+python main.py manual
+```
+
 ## Design Principles
 
 ### 1. Self-Contained Games
@@ -136,9 +224,9 @@ For complex environments (Game 2+), each README includes:
 - Performance comparisons
 
 ### 3. Extensible Structure
-Adding Game 3 is simple:
+Adding Game 5 is simple:
 ```bash
-mkdir games/game-3-name
+mkdir games/game-5-name
 # Add your README.md, train.py, etc.
 # Update this main README
 ```
@@ -150,6 +238,8 @@ gymnasium>=0.29.0      # Core RL environment API
 minigrid>=2.3.0        # Gridworld environments  
 numpy>=1.24.0          # Numerical operations
 matplotlib>=3.7.0      # Training visualizations
+torch>=2.0.0           # Neural networks (Game 4+)
+pygame>=2.5.0          # Custom rendering (Game 3+)
 ```
 
 Each game may have additional specific requirements listed in its own README.
@@ -171,28 +261,31 @@ Each game may have additional specific requirements listed in its own README.
 
 | Game | Concept | Status |
 |------|---------|--------|
-| 3 | ??? (To Be Decided) | 🔜 Coming Soon |
+| 5 | ??? (To Be Decided) | 🔜 Coming Soon |
 
 Potential ideas:
-- Continuous state space (CartPole with function approximation)
+- Policy Gradient methods (REINFORCE, Actor-Critic)
+- Continuous action spaces (Pendulum, LunarLander)
 - Multi-agent scenario
-- Atari game (Deep Q-Networks)
-- Custom 3D navigation
+- Atari game (full DQN with CNN)
+- Model-based RL
 
 ## Lessons Summary
 
-| Concept | Game 1 | Game 2 |
-|---------|--------|--------|
-| **Environment** | Fixed grid | Dynamic obstacles |
-| **State Space** | 16 discrete | ~23k discrete |
-| **Key Challenge** | Credit assignment | State representation |
-| **Breakthrough** | ε-decay works | Hybrid state features |
-| **Winning Insight** | Simple is effective | Precision where it matters |
+| Concept | Game 1 | Game 2 | Game 3 | Game 4 |
+|---------|--------|--------|--------|--------|
+| **Environment** | Fixed grid | Dynamic obstacles | Custom cardinal nav | Continuous control |
+| **State Space** | 16 discrete | ~23k discrete | Continuous positions | 4 continuous |
+| **Algorithm** | Q-learning | Q-learning | (Environment only) | DQN / DDQN |
+| **Key Challenge** | Credit assignment | State representation | Env design | Training stability |
+| **Breakthrough** | ε-decay works | Hybrid state features | BFS reachability | DDQN + Polyak |
+| **Winning Insight** | Simple is effective | Precision where it matters | Simple actions help | Separate eval from training |
 
 ## Acknowledgments
 
 - **OpenAI Gymnasium** for the environment API
 - **MiniGrid** for the customizable gridworld framework
+- **PyTorch** for deep learning tools
 - Classic RL textbooks (Sutton & Barto) for the fundamentals
 
 ---
