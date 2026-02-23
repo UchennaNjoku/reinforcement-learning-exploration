@@ -1,41 +1,23 @@
-"""
-Test Script for GridWorld Environment
-======================================
-Simple script to verify the environment works correctly.
-
-Usage:
-    python test_env.py
-    python test_env.py --episodes 10 --render
-
-"""
-
 from __future__ import annotations
 
 import argparse
 import time
-
 from env import GridWorldEnv
+
+from environment.constants import TILE_EMPTY, TILE_WALL, UP, DOWN, LEFT, RIGHT
+from environment.generation import bfs_reachable
 
 
 def test_environment(episodes: int = 5, render: bool = False, delay: float = 0.2):
-    """
-    Run a simple test on the GridWorld environment.
-
-    Args:
-        episodes: Number of test episodes to run.
-        render: Whether to render the environment.
-        delay: Delay between steps when rendering.
-    """
     print("=" * 60)
     print("GRIDWORLD ENVIRONMENT TEST")
     print("=" * 60)
 
-    # Create environment
     env = GridWorldEnv(
         size=12,
         max_steps=100,
         wall_length=4,
-        render_mode="human" if render else None,
+        render_mode="human" if render else "ansi",   # ✅ important
     )
 
     print(f"\nEnvironment Info:")
@@ -63,14 +45,10 @@ def test_environment(episodes: int = 5, render: bool = False, delay: float = 0.2
         print(f"  Distance:    {info['dist_to_goal']:.2f}")
 
         if not render:
-            # Print ASCII representation
-            print("\n" + env._render_text())
+            print("\n" + env.render())  # ✅ ansi render string
 
-        # Random action loop
         while not done:
-            # Random action
             action = env.action_space.sample()
-
             obs, reward, terminated, truncated, info = env.step(action)
             episode_reward += reward
             step_count += 1
@@ -92,7 +70,6 @@ def test_environment(episodes: int = 5, render: bool = False, delay: float = 0.2
         print(f"  Steps: {step_count}")
         print(f"  Reward: {episode_reward:.2f}")
 
-    # Summary
     print("\n" + "=" * 60)
     print("TEST SUMMARY")
     print("=" * 60)
@@ -105,7 +82,6 @@ def test_environment(episodes: int = 5, render: bool = False, delay: float = 0.2
 
     env.close()
 
-    # Test reachability check
     print("\n" + "=" * 60)
     print("REACHABILITY TEST")
     print("=" * 60)
@@ -113,54 +89,46 @@ def test_environment(episodes: int = 5, render: bool = False, delay: float = 0.2
 
 
 def test_reachability(env: GridWorldEnv, n_tests: int = 10):
-    """Test that the reachability check works correctly."""
     reachable_count = 0
-
     for i in range(n_tests):
         env.reset()
-        is_reachable = env._is_reachable(env.agent_pos, env.goal_pos)
-        if is_reachable:
-            reachable_count += 1
-        print(f"  Test {i+1}: Goal at {env.goal_pos} is {'reachable' if is_reachable else 'NOT reachable'} from {env.agent_pos}")
+        ok = bfs_reachable(env.grid, env.size, env.agent_pos, env.goal_pos)  # ✅ moved to generation.py
+        reachable_count += int(ok)
+        print(f"  Test {i+1}: Goal at {env.goal_pos} is {'reachable' if ok else 'NOT reachable'} from {env.agent_pos}")
 
     print(f"\n  All {n_tests} generated grids have reachable goals: {'PASS' if reachable_count == n_tests else 'FAIL'}")
 
 
 def test_action_deltas():
-    """Test that action deltas are correct."""
     print("\n" + "=" * 60)
     print("ACTION DELTA TEST")
     print("=" * 60)
 
-    # Create a clean grid for testing (no walls except border)
     env = GridWorldEnv(size=7)  # 5x5 playable area
     env.reset(seed=42)
-    
-    # Clear all obstacles and internal walls for this test
-    env.grid.fill(env.TILE_EMPTY)
-    env.grid[0, :] = env.TILE_WALL  # Top border
-    env.grid[-1, :] = env.TILE_WALL  # Bottom border
-    env.grid[:, 0] = env.TILE_WALL  # Left border
-    env.grid[:, -1] = env.TILE_WALL  # Right border
+
+    env.grid.fill(TILE_EMPTY)
+    env.grid[0, :] = TILE_WALL
+    env.grid[-1, :] = TILE_WALL
+    env.grid[:, 0] = TILE_WALL
+    env.grid[:, -1] = TILE_WALL
     env.obstacle_positions = []
 
-    # Test from center position (3, 3) in a 7x7 grid
     test_cases = [
-        (GridWorldEnv.UP, (3, 2), "UP should decrease y"),
-        (GridWorldEnv.DOWN, (3, 4), "DOWN should increase y"),
-        (GridWorldEnv.LEFT, (2, 3), "LEFT should decrease x"),
-        (GridWorldEnv.RIGHT, (4, 3), "RIGHT should increase x"),
+        (UP, (3, 2), "UP should decrease y"),
+        (DOWN, (3, 4), "DOWN should increase y"),
+        (LEFT, (2, 3), "LEFT should decrease x"),
+        (RIGHT, (4, 3), "RIGHT should increase x"),
     ]
 
     all_passed = True
     for action, expected_pos, description in test_cases:
-        env.agent_pos = (3, 3)  # Reset position to center
+        env.agent_pos = (3, 3)
         obs, _, _, _, _ = env.step(action)
-        actual_pos = (int(obs['agent_pos'][0]), int(obs['agent_pos'][1]))
+        actual_pos = (int(obs["agent_pos"][0]), int(obs["agent_pos"][1]))
         passed = actual_pos == expected_pos
         all_passed = all_passed and passed
-        status = "PASS" if passed else "FAIL"
-        print(f"  {status}: {description}")
+        print(f"  {'PASS' if passed else 'FAIL'}: {description}")
         print(f"       Expected: {expected_pos}, Got: {actual_pos}")
 
     print(f"\n  All action tests: {'PASS' if all_passed else 'FAIL'}")
@@ -170,36 +138,11 @@ def main():
     parser = argparse.ArgumentParser(
         description="Test the GridWorld environment",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python test_env.py              # Run tests without rendering
-  python test_env.py --render     # Run tests with visual rendering
-  python test_env.py --action-test  # Test action deltas only
-        """,
     )
-    parser.add_argument(
-        "--episodes",
-        type=int,
-        default=5,
-        help="Number of test episodes (default: 5)",
-    )
-    parser.add_argument(
-        "--render",
-        action="store_true",
-        help="Render the environment during tests",
-    )
-    parser.add_argument(
-        "--delay",
-        type=float,
-        default=0.1,
-        help="Delay between steps when rendering (default: 0.1)",
-    )
-    parser.add_argument(
-        "--action-test",
-        action="store_true",
-        help="Only run action delta tests",
-    )
-
+    parser.add_argument("--episodes", type=int, default=5)
+    parser.add_argument("--render", action="store_true")
+    parser.add_argument("--delay", type=float, default=0.1)
+    parser.add_argument("--action-test", action="store_true")
     args = parser.parse_args()
 
     if args.action_test:
