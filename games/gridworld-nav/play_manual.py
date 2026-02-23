@@ -24,6 +24,7 @@ import argparse
 
 import gymnasium as gym
 import numpy as np
+import sys
 
 from env import GridWorldEnv
 
