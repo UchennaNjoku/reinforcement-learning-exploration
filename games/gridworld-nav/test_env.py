@@ -7,18 +7,14 @@ Usage:
     python test_env.py
     python test_env.py --episodes 10 --render
 
-Author: Chenna (CS Senior, Bethune-Cookman University)
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
 import time
 
-sys.path.insert(0, str(__file__).rsplit("/", 1)[0] if "/" in __file__ else ".")
-
-from envs.grid_world_env import GridWorldEnv
+from env import GridWorldEnv
 
 
 def test_environment(episodes: int = 5, render: bool = False, delay: float = 0.2):

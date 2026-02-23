@@ -21,15 +21,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 
 import gymnasium as gym
 import numpy as np
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(__file__).rsplit("/", 1)[0] if "/" in __file__ else ".")
-
-from envs.grid_world_env import GridWorldEnv
+from env import GridWorldEnv
 
 
 def play_manual(size: int = 12, max_steps: int = 120, wall_length: int = 4):

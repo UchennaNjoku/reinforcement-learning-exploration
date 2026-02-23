@@ -12,12 +12,11 @@ Features:
 - Reachability guarantee via BFS check
 
 Actions:
-    0 = UP    (decrease y)
+    0 = UP    (decrease y) (row index)
     1 = DOWN  (increase y)
     2 = LEFT  (decrease x)
     3 = RIGHT (increase x)
 
-Author: Chenna (CS Senior, Bethune-Cookman University)
 """
 
 from __future__ import annotations
@@ -100,7 +99,7 @@ class GridWorldEnv(gym.Env):
         self.render_mode = render_mode
 
         if max_steps is None:
-            max_steps = 4 * size**2
+            max_steps = 3 * size**2
         self.max_steps = max_steps
 
         # Grid state
@@ -174,31 +173,39 @@ class GridWorldEnv(gym.Env):
     def _place_blocking_wall(
         self,
         agent_pos: Tuple[int, int],
-        goal_pos: Tuple[int, int]
+        goal_pos: Tuple[int, int],
     ) -> List[Tuple[int, int]]:
         """
-        Place a wall perpendicular to the agent-goal line, somewhere between them.
-        The wall position is randomized along the line.
-        Returns list of wall tile positions.
+        Place a wall roughly perpendicular to the agent-goal line somewhere between them.
+        Returns exactly self.wall_length placed tiles (unless impossible at all attempts).
+
+        Notes:
+        - Coordinate convention: grid[y, x]
+        - If delta_x > delta_y (goal mostly left/right), we place a VERTICAL wall (x fixed).
+        Else we place a HORIZONTAL wall (y fixed).
         """
         t_min, t_max = self.wall_position_range
         t = np.random.uniform(t_min, t_max)
 
-        # Calculate wall center position (along the line from agent to goal)
         ax, ay = agent_pos
         gx, gy = goal_pos
-        wall_x = int(ax + t * (gx - ax))
-        wall_y = int(ay + t * (gy - ay))
 
-        # Determine wall orientation
+        # Pick an integer "center" cell along the segment agent->goal
+        wall_x = int(round(ax + t * (gx - ax)))
+        wall_y = int(round(ay + t * (gy - ay)))
+
         delta_x = abs(gx - ax)
         delta_y = abs(gy - ay)
-        is_horizontal_path = delta_x > delta_y
+        path_is_more_horizontal = delta_x > delta_y
 
-        wall_positions = []
-        half_len = self.wall_length // 2
+        # Offsets with EXACT length = wall_length, centered around 0
+        # Example L=4 => offsets [-1, 0, 1, 2] (or [-2,-1,0,1] also fine; this keeps symmetry-ish)
+        # Example L=5 => offsets [-2,-1,0,1,2]
+        L = int(self.wall_length)
+        start = -(L // 2)
+        offsets = list(range(start, start + L))  # length L always
 
-        # Try multiple positions with jitter if needed
+        # Candidate centers to try (jitter)
         attempts = [
             (wall_x, wall_y),
             (wall_x + 1, wall_y),
@@ -207,23 +214,36 @@ class GridWorldEnv(gym.Env):
             (wall_x, wall_y - 1),
         ]
 
-        for attempt_x, attempt_y in attempts:
-            if len(wall_positions) >= self.wall_length:
-                break
+        for cx, cy in attempts:
+            placed: List[Tuple[int, int]] = []
 
-            for offset in range(-half_len, half_len + 1):
-                if is_horizontal_path:
-                    wx, wy = attempt_x, attempt_y + offset
+            for off in offsets:
+                if path_is_more_horizontal:
+                    # VERTICAL wall: x fixed, vary y
+                    wx, wy = cx, cy + off
                 else:
-                    wx, wy = attempt_x + offset, attempt_y
+                    # HORIZONTAL wall: y fixed, vary x
+                    wx, wy = cx + off, cy
 
-                if self._is_valid_pos(wx, wy):
-                    if (wx, wy) != agent_pos and (wx, wy) != goal_pos:
-                        if self.grid[wy, wx] == self.TILE_EMPTY:
-                            self.grid[wy, wx] = self.TILE_WALL
-                            wall_positions.append((wx, wy))
+                if not self._is_valid_pos(wx, wy):
+                    continue
+                if (wx, wy) == agent_pos or (wx, wy) == goal_pos:
+                    continue
+                if self.grid[wy, wx] != self.TILE_EMPTY:
+                    continue
 
-        return wall_positions
+                self.grid[wy, wx] = self.TILE_WALL
+                placed.append((wx, wy))
+
+                if len(placed) == L:
+                    return placed  # EXACT length reached
+
+            # If we didn't manage to place L tiles, undo partial placement and try next jitter center
+            for (wx, wy) in placed:
+                self.grid[wy, wx] = self.TILE_EMPTY
+
+        # If all attempts fail, return empty and let generator retry
+        return []
 
     def _generate_grid(self) -> bool:
         """
@@ -519,14 +539,4 @@ class GridWorldEnv(gym.Env):
             self.window = None
             self.clock = None
 
-    def get_state_for_q_learning(self) -> tuple:
-        """
-        Convert current observation to a discrete state tuple for tabular Q-learning.
-        Returns: (agent_x, agent_y, goal_x, goal_y)
-        """
-        return (
-            int(self.agent_pos[0]),
-            int(self.agent_pos[1]),
-            int(self.goal_pos[0]),
-            int(self.goal_pos[1]),
-        )
+    
