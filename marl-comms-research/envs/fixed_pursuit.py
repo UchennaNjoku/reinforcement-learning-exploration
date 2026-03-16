@@ -88,16 +88,19 @@ class FixedMapPursuitWrapper:
         step_penalty: float = -0.01,
         catch_reward: float = 1.0,
         tag_reward: float = 0.0,
-        n_catch: int = 2,
+        n_catch: int = 1,
         surround: bool = True,
         shared_reward: bool = True,
         freeze_evaders: bool = False,
+        distance_reward_scale: float = 0.0,
     ) -> None:
         if map_name not in MAP_SPECS:
             available = ", ".join(sorted(MAP_SPECS))
             raise ValueError(f"Unknown map_name={map_name!r}. Available: {available}")
 
         self.map_spec = MAP_SPECS[map_name]
+        self._grid_size = self.map_spec.grid.shape[0]
+        self._distance_reward_scale = distance_reward_scale
         self.env = pursuit_v4.parallel_env(
             x_size=self.map_spec.grid.shape[0],
             y_size=self.map_spec.grid.shape[1],
@@ -185,6 +188,23 @@ class FixedMapPursuitWrapper:
             for idx, agent in enumerate(self.possible_agents)
         }
 
+    def _evader_positions(self) -> list[GridPos]:
+        base = self._base_env()
+        return [
+            tuple(int(v) for v in base.evader_layer.get_position(i))
+            for i in range(base.evader_layer.n_agents())
+        ]
+
+    def _distance_reward(self, pursuer_pos: GridPos) -> float:
+        """Manhattan distance penalty toward nearest evader, normalized to [-1, 0]."""
+        evaders = self._evader_positions()
+        if not evaders:
+            return 0.0
+        px, py = pursuer_pos
+        min_dist = min(abs(px - ex) + abs(py - ey) for ex, ey in evaders)
+        max_dist = 2 * (self._grid_size - 1)
+        return -self._distance_reward_scale * (min_dist / max_dist)
+
     def _observations(self) -> dict[str, np.ndarray]:
         return {
             agent: self.env.aec_env.observe(agent)
@@ -244,7 +264,14 @@ class FixedMapPursuitWrapper:
             }
 
         self.last_positions = new_positions
-        clean_rewards = {agent: float(reward) for agent, reward in rewards.items()}
+        clean_rewards = {
+            agent: float(reward) + (
+                self._distance_reward(new_positions[agent])
+                if self._distance_reward_scale > 0.0
+                else 0.0
+            )
+            for agent, reward in rewards.items()
+        }
         return observations, clean_rewards, terminations, truncations, wrapped_infos
 
 

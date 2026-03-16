@@ -75,7 +75,7 @@ def run_eval(args: argparse.Namespace) -> dict:
     else:
         print("Evaluating RANDOM policy (no checkpoint).")
 
-    env = make_fixed_pursuit_env(map_name=args.map)
+    env = make_fixed_pursuit_env(map_name=args.map, n_catch=args.n_catch)
     n_actions = env.action_space("pursuer_0").n
 
     captures = 0
@@ -158,6 +158,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--map", default="easy_open", choices=["easy_open", "center_block", "split_barrier"])
     p.add_argument("--episodes", type=int, default=50)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--n-catch", type=int, default=1)
     p.add_argument("--output", default=None, help="Path to save JSON results")
     return p.parse_args()
 

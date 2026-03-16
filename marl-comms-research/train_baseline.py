@@ -102,7 +102,11 @@ def train(args: argparse.Namespace) -> None:
     ckpt_dir = results_dir / "checkpoints"
     ckpt_dir.mkdir(exist_ok=True)
 
-    env = make_fixed_pursuit_env(map_name=args.map)
+    env = make_fixed_pursuit_env(
+        map_name=args.map,
+        n_catch=args.n_catch,
+        distance_reward_scale=args.distance_reward_scale,
+    )
     n_actions = env.action_space("pursuer_0").n
 
     online_net = PursuitQNet(n_agents=3, n_actions=n_actions).to(device)
@@ -264,6 +268,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eps-decay-steps", type=int, default=50_000)
     p.add_argument("--log-interval", type=int, default=100)
     p.add_argument("--save-interval", type=int, default=500)
+    p.add_argument("--n-catch", type=int, default=1, help="Pursuers needed adjacent to catch (1=easy, 2=hard)")
+    p.add_argument("--distance-reward-scale", type=float, default=0.1, help="Scale for dense distance-to-prey reward (0=off)")
     p.add_argument("--results-dir", default="results/baseline")
     return p.parse_args()
 
