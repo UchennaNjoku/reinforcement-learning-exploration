@@ -1,0 +1,11 @@
+{
+  "map": "center_block",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "./results/baseline_v3/checkpoints/baseline_final.pt",
+  "capture_rate": 0.995,
+  "escape_rate": 0.005,
+  "avg_steps": 40.52,
+  "avg_steps_capture": 39.22,
+  "collision_rate": 0.0139
+}

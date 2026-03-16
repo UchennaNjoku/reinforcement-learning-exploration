@@ -1,0 +1,11 @@
+{
+  "map": "easy_open",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "/kaggle/working/results/baseline_v3/checkpoints/baseline_final.pt",
+  "capture_rate": 1.0,
+  "escape_rate": 0.0,
+  "avg_steps": 14.49,
+  "avg_steps_capture": 14.49,
+  "collision_rate": 0.001
+}

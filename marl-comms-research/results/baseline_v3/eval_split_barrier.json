@@ -1,0 +1,11 @@
+{
+  "map": "split_barrier",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "./results/baseline_v3/checkpoints/baseline_final.pt",
+  "capture_rate": 0.99,
+  "escape_rate": 0.01,
+  "avg_steps": 60.02,
+  "avg_steps_capture": 57.6,
+  "collision_rate": 0.1551
+}

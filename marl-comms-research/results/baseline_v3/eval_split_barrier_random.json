@@ -1,0 +1,11 @@
+{
+  "map": "split_barrier",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "random",
+  "capture_rate": 0.535,
+  "escape_rate": 0.465,
+  "avg_steps": 234.83,
+  "avg_steps_capture": 178.19,
+  "collision_rate": 0.066
+}
