@@ -151,20 +151,18 @@ def run_eval(args: argparse.Namespace) -> dict:
     ckpt_map     = saved.get("map",     None)
     ckpt_n_catch = saved.get("n_catch", None)
 
-    eval_map     = args.map
-    eval_n_catch = args.n_catch
+    eval_map     = ckpt_map     if ckpt_map     is not None else args.map
+    eval_n_catch = ckpt_n_catch if ckpt_n_catch is not None else args.n_catch
 
     if ckpt_map is not None and ckpt_map != args.map:
         print(
-            f"  WARNING: checkpoint was trained on map='{ckpt_map}' "
-            f"but --map='{args.map}' was passed. "
-            f"Using CLI value '{args.map}' — results may not be comparable."
+            f"  WARNING: --map='{args.map}' ignored. "
+            f"Using checkpoint's map='{ckpt_map}'."
         )
     if ckpt_n_catch is not None and ckpt_n_catch != args.n_catch:
         print(
-            f"  WARNING: checkpoint used n_catch={ckpt_n_catch} "
-            f"but --n-catch={args.n_catch} was passed. "
-            f"Using CLI value {args.n_catch}."
+            f"  WARNING: --n-catch={args.n_catch} ignored. "
+            f"Using checkpoint's n_catch={ckpt_n_catch}."
         )
 
     env = make_fixed_pursuit_env(map_name=eval_map, n_catch=eval_n_catch, surround=False)
