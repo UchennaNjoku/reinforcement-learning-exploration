@@ -1,0 +1,11 @@
+{
+  "map": "center_block",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "comm4",
+  "capture_rate": 1.0,
+  "escape_rate": 0.0,
+  "avg_steps": 22.91,
+  "avg_steps_capture": 22.91,
+  "collision_rate": 0.3013
+}

@@ -1,0 +1,11 @@
+{
+  "map": "easy_open",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "comm16",
+  "capture_rate": 1.0,
+  "escape_rate": 0.0,
+  "avg_steps": 11.13,
+  "avg_steps_capture": 11.13,
+  "collision_rate": 0.0075
+}
