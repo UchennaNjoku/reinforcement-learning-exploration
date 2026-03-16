@@ -151,18 +151,17 @@ def run_eval(args: argparse.Namespace) -> dict:
     ckpt_map     = saved.get("map",     None)
     ckpt_n_catch = saved.get("n_catch", None)
 
-    eval_map     = ckpt_map     if ckpt_map     is not None else args.map
-    eval_n_catch = ckpt_n_catch if ckpt_n_catch is not None else args.n_catch
+    # args.map / args.n_catch are None when the user didn't pass them explicitly.
+    # Priority: explicit CLI flag > checkpoint saved args > hardcoded default.
+    eval_map     = args.map     if args.map     is not None else (ckpt_map     or "easy_open")
+    eval_n_catch = args.n_catch if args.n_catch is not None else (ckpt_n_catch or 1)
 
-    if ckpt_map is not None and ckpt_map != args.map:
+    if args.map is None and ckpt_map is not None:
+        print(f"  Using checkpoint's map='{ckpt_map}'.")
+    if args.map is not None and ckpt_map is not None and args.map != ckpt_map:
         print(
-            f"  WARNING: --map='{args.map}' ignored. "
-            f"Using checkpoint's map='{ckpt_map}'."
-        )
-    if ckpt_n_catch is not None and ckpt_n_catch != args.n_catch:
-        print(
-            f"  WARNING: --n-catch={args.n_catch} ignored. "
-            f"Using checkpoint's n_catch={ckpt_n_catch}."
+            f"  NOTE: evaluating on map='{args.map}' "
+            f"(checkpoint trained on '{ckpt_map}') — cross-map eval."
         )
 
     env = make_fixed_pursuit_env(map_name=eval_map, n_catch=eval_n_catch, surround=False)
@@ -227,7 +226,7 @@ def run_eval(args: argparse.Namespace) -> dict:
         policy_label = "baseline"
 
     metrics = {
-        "map":               args.map,
+        "map":               eval_map,
         "episodes":          n,
         "seed":              args.seed,
         "policy":            policy_label,
@@ -262,12 +261,13 @@ def parse_args() -> argparse.Namespace:
                    help="Path to .pt checkpoint (baseline or comm; auto-detected)")
     p.add_argument("--random-policy", action="store_true",
                    help="Use random actions (no checkpoint needed)")
-    p.add_argument("--map",           default="easy_open",
-                   choices=["easy_open", "center_block", "split_barrier"])
+    p.add_argument("--map",           default=None,
+                   choices=["easy_open", "center_block", "split_barrier"],
+                   help="Map to evaluate on. Defaults to checkpoint's training map.")
     p.add_argument("--episodes",      type=int, default=50)
     p.add_argument("--seed",          type=int, default=42)
-    p.add_argument("--n-catch",       type=int, default=1,
-                   help="Pursuers required on evader cell (surround=False)")
+    p.add_argument("--n-catch",       type=int, default=None,
+                   help="Pursuers required on evader cell. Defaults to checkpoint's value.")
     p.add_argument("--output",        default=None,
                    help="Path to save JSON results")
     return p.parse_args()
