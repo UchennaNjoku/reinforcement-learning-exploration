@@ -1,0 +1,96 @@
+{
+  "env": "pettingzoo.sisl.pursuit_v4.parallel_env",
+  "config": {
+    "n_pursuers": 3,
+    "n_evaders": 1,
+    "obs_range": 7,
+    "render_mode": null,
+    "seed": 0
+  },
+  "possible_agents": [
+    "pursuer_0",
+    "pursuer_1",
+    "pursuer_2"
+  ],
+  "active_agents_after_reset": [
+    "pursuer_0",
+    "pursuer_1",
+    "pursuer_2"
+  ],
+  "action_spaces": {
+    "pursuer_0": "Discrete(5)",
+    "pursuer_1": "Discrete(5)",
+    "pursuer_2": "Discrete(5)"
+  },
+  "observation_spaces": {
+    "pursuer_0": "Box(0.0, 3.0, (7, 7, 3), float32)",
+    "pursuer_1": "Box(0.0, 3.0, (7, 7, 3), float32)",
+    "pursuer_2": "Box(0.0, 3.0, (7, 7, 3), float32)"
+  },
+  "reset_info_keys": {
+    "pursuer_0": [],
+    "pursuer_1": [],
+    "pursuer_2": []
+  },
+  "first_observation_summary": {
+    "agent": "pursuer_0",
+    "python_type": "ndarray",
+    "value": {
+      "type": "ndarray",
+      "shape": [
+        7,
+        7,
+        3
+      ],
+      "dtype": "float32",
+      "min": 0.0,
+      "max": 1.0,
+      "sample": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "sampled_actions": {
+    "pursuer_0": 1,
+    "pursuer_1": 3,
+    "pursuer_2": 0
+  },
+  "step_outputs": {
+    "next_observation_keys": [
+      "pursuer_0",
+      "pursuer_1",
+      "pursuer_2"
+    ],
+    "rewards": {
+      "pursuer_0": -0.10000000000000002,
+      "pursuer_1": -0.10000000000000002,
+      "pursuer_2": -0.10000000000000002
+    },
+    "terminations": {
+      "pursuer_0": false,
+      "pursuer_1": false,
+      "pursuer_2": false
+    },
+    "truncations": {
+      "pursuer_0": false,
+      "pursuer_1": false,
+      "pursuer_2": false
+    },
+    "info_keys": {
+      "pursuer_0": [],
+      "pursuer_1": [],
+      "pursuer_2": []
+    }
+  }
+}
