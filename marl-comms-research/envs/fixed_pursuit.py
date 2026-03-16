@@ -89,7 +89,7 @@ class FixedMapPursuitWrapper:
         catch_reward: float = 1.0,
         tag_reward: float = 0.0,
         n_catch: int = 1,
-        surround: bool = True,
+        surround: bool = False,
         shared_reward: bool = True,
         freeze_evaders: bool = False,
         distance_reward_scale: float = 0.0,
