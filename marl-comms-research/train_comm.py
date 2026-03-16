@@ -180,6 +180,10 @@ def train(args: argparse.Namespace) -> None:
 
     total_steps = 0
     episode_log: list[dict] = []
+    # Rolling buffer of message logs for the last msg_log_window episodes.
+    # Only the final window is saved — enough for interpretability without
+    # writing gigabytes of data for every training episode.
+    msg_log_buffer: list[dict] = []   # [{episode, captured, steps: [{agent: msg_idx}]}]
 
     print(
         f"Training for {args.episodes} episodes on map '{args.map}' | seed {args.seed}\n"
@@ -239,7 +243,7 @@ def train(args: argparse.Namespace) -> None:
                 )
                 ep_rewards[agent] += rewards[agent]
 
-            msg_log.append({a: msg_actions.get(a, -1) for a in AGENT_IDS})
+            msg_log.append({a: int(msg_actions.get(a, -1)) for a in AGENT_IDS})
             prev_messages = new_messages
             obs = next_obs
 
@@ -264,6 +268,16 @@ def train(args: argparse.Namespace) -> None:
 
             if done_global:
                 break
+
+        # Keep rolling window of message trajectories for interpretability.
+        msg_log_buffer.append({
+            "episode":  ep,
+            "captured": captured,
+            "steps":    ep_steps,
+            "messages": msg_log,
+        })
+        if len(msg_log_buffer) > args.msg_log_window:
+            msg_log_buffer.pop(0)
 
         team_reward = sum(ep_rewards.values()) / len(ep_rewards)
         episode_log.append({
@@ -317,6 +331,11 @@ def train(args: argparse.Namespace) -> None:
         json.dump(episode_log, f, indent=2)
     print(f"Training log saved → {log_path}")
 
+    msg_log_path = results_dir / f"comm{args.vocab_size}_msg_log_seed{args.seed}.json"
+    with open(msg_log_path, "w") as f:
+        json.dump(msg_log_buffer, f, indent=2)
+    print(f"Message log saved  → {msg_log_path}  ({len(msg_log_buffer)} episodes)")
+
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -344,6 +363,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--distance-reward-scale", type=float, default=0.1)
     p.add_argument("--log-interval",      type=int,   default=100)
     p.add_argument("--save-interval",     type=int,   default=500)
+    p.add_argument("--msg-log-window",    type=int,   default=500,
+                   help="Number of final training episodes whose message trajectories are saved for interpretability")
     p.add_argument("--results-dir",       default="results/comm")
     return p.parse_args()
 
