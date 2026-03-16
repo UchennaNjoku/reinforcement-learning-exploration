@@ -1,5 +1,10 @@
 """Evaluation script for trained pursuit agents.
 
+Supports three policy modes:
+  1. Baseline (no-comm) checkpoint  — PursuitQNet
+  2. Comm checkpoint                — CommQNet (auto-detected from saved args)
+  3. Random policy                  — no checkpoint needed
+
 Runs N episodes with a greedy policy (epsilon = 0) and records:
   - capture_rate      : fraction of episodes where prey was caught
   - escape_rate       : fraction where prey was NOT caught
@@ -7,12 +12,12 @@ Runs N episodes with a greedy policy (epsilon = 0) and records:
   - avg_steps_capture : mean steps for episodes that ended in capture
   - collision_rate    : fraction of agent steps that were blocked moves
 
-Output is printed to stdout and saved as JSON.
+Output is printed to stdout and optionally saved as JSON.
 
 Usage:
-    python eval.py --checkpoint results/baseline/checkpoints/baseline_final.pt
-    python eval.py --checkpoint path/to/ckpt.pt --episodes 100 --map easy_open
-    python eval.py --random-policy --map easy_open   # random baseline (no checkpoint)
+    python eval.py --checkpoint results/baseline_v3/checkpoints/baseline_final.pt
+    python eval.py --checkpoint results/comm/checkpoints/comm4_final.pt
+    python eval.py --random-policy --map easy_open
 """
 
 from __future__ import annotations
@@ -29,16 +34,17 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from envs import make_fixed_pursuit_env
 from models.qnet import PursuitQNet
+from models.comm_qnet import CommQNet
+from train_comm import (
+    zero_messages, build_received, msg_to_onehot, AGENT_IDS, N_AGENTS
+)
 
 
-AGENT_IDS: dict[str, int] = {
-    "pursuer_0": 0,
-    "pursuer_1": 1,
-    "pursuer_2": 2,
-}
+# ---------------------------------------------------------------------------
+# Action selectors
+# ---------------------------------------------------------------------------
 
-
-def greedy_actions(
+def greedy_baseline(
     qnet: PursuitQNet,
     observations: dict[str, np.ndarray],
     device: torch.device,
@@ -53,47 +59,114 @@ def greedy_actions(
     return actions
 
 
-def random_actions(
-    env,
+def greedy_comm(
+    qnet: CommQNet,
     observations: dict[str, np.ndarray],
-) -> dict[str, int]:
+    prev_messages: dict[str, np.ndarray],
+    device: torch.device,
+) -> tuple[dict[str, int], dict[str, np.ndarray]]:
+    """Returns move actions and updated message dict."""
+    move_actions: dict[str, int] = {}
+    new_messages: dict[str, np.ndarray] = {}
+
+    for agent, obs in observations.items():
+        obs_t  = torch.from_numpy(obs.transpose(2, 0, 1)).unsqueeze(0).to(device)
+        aid_t  = torch.tensor([AGENT_IDS[agent]], dtype=torch.long, device=device)
+        recv   = build_received(agent, prev_messages)
+        recv_t = torch.from_numpy(recv).unsqueeze(0).to(device)
+        with torch.no_grad():
+            q = qnet(obs_t, aid_t, recv_t)
+        joint = int(q.argmax(dim=1).item())
+        move, msg = qnet.decode_action(joint)
+        move_actions[agent]  = move
+        new_messages[agent]  = msg_to_onehot(msg, qnet.vocab_size)
+
+    return move_actions, new_messages
+
+
+def random_actions(env, observations: dict[str, np.ndarray]) -> dict[str, int]:
     return {agent: env.action_space(agent).sample() for agent in observations}
 
+
+# ---------------------------------------------------------------------------
+# Checkpoint loader
+# ---------------------------------------------------------------------------
+
+def load_checkpoint(path: str, device: torch.device):
+    """Load checkpoint, auto-detect model type from saved args.
+
+    Returns (model, ckpt_dict, is_comm).
+    """
+    ckpt = torch.load(path, map_location=device, weights_only=False)
+    saved_args = ckpt.get("args", {})
+    vocab_size = saved_args.get("vocab_size", None)
+
+    if vocab_size is not None:
+        # Communication model
+        model = CommQNet(
+            n_agents=N_AGENTS,
+            n_move_actions=5,
+            vocab_size=vocab_size,
+        ).to(device)
+        model.load_state_dict(ckpt["model_state"])
+        model.eval()
+        return model, ckpt, True
+    else:
+        # Baseline model
+        model = PursuitQNet(n_agents=N_AGENTS, n_actions=5).to(device)
+        model.load_state_dict(ckpt["model_state"])
+        model.eval()
+        return model, ckpt, False
+
+
+# ---------------------------------------------------------------------------
+# Evaluation loop
+# ---------------------------------------------------------------------------
 
 def run_eval(args: argparse.Namespace) -> dict:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    qnet = None
+    model = None
+    is_comm = False
+
     if not args.random_policy:
-        ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
-        qnet = PursuitQNet(n_agents=3, n_actions=5).to(device)
-        qnet.load_state_dict(ckpt["model_state"])
-        qnet.eval()
-        trained_ep = ckpt.get("episode", "?")
+        model, ckpt, is_comm = load_checkpoint(args.checkpoint, device)
+        trained_ep    = ckpt.get("episode", "?")
         trained_steps = ckpt.get("total_steps", "?")
-        print(f"Loaded checkpoint: episode={trained_ep}, total_steps={trained_steps}")
+        model_type    = "comm" if is_comm else "baseline"
+        print(
+            f"Loaded {model_type} checkpoint: "
+            f"episode={trained_ep}, total_steps={trained_steps}"
+        )
+        if is_comm:
+            print(f"  vocab_size={model.vocab_size}, "
+                  f"joint_actions={model.n_joint_actions}")
     else:
         print("Evaluating RANDOM policy (no checkpoint).")
 
     env = make_fixed_pursuit_env(map_name=args.map, n_catch=args.n_catch, surround=False)
-    n_actions = env.action_space("pursuer_0").n
 
     captures = 0
     episode_steps: list[int] = []
     capture_steps: list[int] = []
-    total_blocked = 0
-    total_agent_steps = 0
+    total_blocked      = 0
+    total_agent_steps  = 0
 
     for ep in range(args.episodes):
         obs, _ = env.reset(seed=args.seed + ep)
         ep_steps = 0
         captured = False
 
+        if is_comm:
+            prev_messages = zero_messages(model.vocab_size)
+
         while True:
-            if qnet is not None:
-                actions = greedy_actions(qnet, obs, device)
-            else:
+            if model is None:
                 actions = random_actions(env, obs)
+            elif is_comm:
+                actions, prev_messages = greedy_comm(model, obs, prev_messages, device)
+            else:
+                actions = greedy_baseline(model, obs, device)
 
             next_obs, _, terminations, truncations, infos = env.step(actions)
             ep_steps += 1
@@ -106,7 +179,7 @@ def run_eval(args: argparse.Namespace) -> dict:
                     captured = True
 
             done = any(terminations.values()) or any(truncations.values()) or not env.agents
-            obs = next_obs
+            obs  = next_obs
 
             if done:
                 break
@@ -119,22 +192,29 @@ def run_eval(args: argparse.Namespace) -> dict:
     env.close()
 
     n = args.episodes
-    capture_rate = captures / n
-    escape_rate = 1.0 - capture_rate
-    avg_steps = float(np.mean(episode_steps))
+    capture_rate      = captures / n
+    avg_steps         = float(np.mean(episode_steps))
     avg_steps_capture = float(np.mean(capture_steps)) if capture_steps else None
-    collision_rate = total_blocked / max(1, total_agent_steps)
+    collision_rate    = total_blocked / max(1, total_agent_steps)
+
+    if args.random_policy:
+        policy_label = "random"
+    elif is_comm:
+        saved_args = ckpt.get("args", {})
+        policy_label = f"comm{model.vocab_size}"
+    else:
+        policy_label = "baseline"
 
     metrics = {
-        "map": args.map,
-        "episodes": n,
-        "seed": args.seed,
-        "policy": "random" if args.random_policy else str(args.checkpoint),
-        "capture_rate": round(capture_rate, 4),
-        "escape_rate": round(escape_rate, 4),
-        "avg_steps": round(avg_steps, 2),
+        "map":               args.map,
+        "episodes":          n,
+        "seed":              args.seed,
+        "policy":            policy_label,
+        "capture_rate":      round(capture_rate, 4),
+        "escape_rate":       round(1.0 - capture_rate, 4),
+        "avg_steps":         round(avg_steps, 2),
         "avg_steps_capture": round(avg_steps_capture, 2) if avg_steps_capture else None,
-        "collision_rate": round(collision_rate, 4),
+        "collision_rate":    round(collision_rate, 4),
     }
 
     print("\n--- Evaluation Results ---")
@@ -151,15 +231,24 @@ def run_eval(args: argparse.Namespace) -> dict:
     return metrics
 
 
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Evaluate a trained pursuit agent")
-    p.add_argument("--checkpoint", default=None, help="Path to .pt checkpoint file")
-    p.add_argument("--random-policy", action="store_true", help="Use random actions (no checkpoint needed)")
-    p.add_argument("--map", default="easy_open", choices=["easy_open", "center_block", "split_barrier"])
-    p.add_argument("--episodes", type=int, default=50)
-    p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--n-catch", type=int, default=1, help="Pursuers required on evader cell to catch when surround=False (1=easy overlap, 2=harder)")
-    p.add_argument("--output", default=None, help="Path to save JSON results")
+    p.add_argument("--checkpoint",    default=None,
+                   help="Path to .pt checkpoint (baseline or comm; auto-detected)")
+    p.add_argument("--random-policy", action="store_true",
+                   help="Use random actions (no checkpoint needed)")
+    p.add_argument("--map",           default="easy_open",
+                   choices=["easy_open", "center_block", "split_barrier"])
+    p.add_argument("--episodes",      type=int, default=50)
+    p.add_argument("--seed",          type=int, default=42)
+    p.add_argument("--n-catch",       type=int, default=1,
+                   help="Pursuers required on evader cell (surround=False)")
+    p.add_argument("--output",        default=None,
+                   help="Path to save JSON results")
     return p.parse_args()
 
 
