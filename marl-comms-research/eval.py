@@ -65,21 +65,22 @@ def greedy_comm(
     prev_messages: dict[str, np.ndarray],
     device: torch.device,
 ) -> tuple[dict[str, int], dict[str, np.ndarray]]:
-    """Returns move actions and updated message dict."""
+    """Returns move actions and updated message dict using separate heads."""
     move_actions: dict[str, int] = {}
     new_messages: dict[str, np.ndarray] = {}
 
     for agent, obs in observations.items():
         obs_t  = torch.from_numpy(obs.transpose(2, 0, 1)).unsqueeze(0).to(device)
         aid_t  = torch.tensor([AGENT_IDS[agent]], dtype=torch.long, device=device)
-        recv   = build_received(agent, prev_messages)
-        recv_t = torch.from_numpy(recv).unsqueeze(0).to(device)
+        recv_t = torch.from_numpy(
+            build_received(agent, prev_messages)
+        ).unsqueeze(0).to(device)
         with torch.no_grad():
-            q = qnet(obs_t, aid_t, recv_t)
-        joint = int(q.argmax(dim=1).item())
-        move, msg = qnet.decode_action(joint)
-        move_actions[agent]  = move
-        new_messages[agent]  = msg_to_onehot(msg, qnet.vocab_size)
+            move_q, msg_q = qnet(obs_t, aid_t, recv_t)
+        move = int(move_q.argmax(dim=1).item())
+        msg  = int(msg_q.argmax(dim=1).item())
+        move_actions[agent] = move
+        new_messages[agent] = msg_to_onehot(msg, qnet.vocab_size)
 
     return move_actions, new_messages
 
@@ -140,8 +141,7 @@ def run_eval(args: argparse.Namespace) -> dict:
             f"episode={trained_ep}, total_steps={trained_steps}"
         )
         if is_comm:
-            print(f"  vocab_size={model.vocab_size}, "
-                  f"joint_actions={model.n_joint_actions}")
+            print(f"  vocab_size={model.vocab_size}")
     else:
         print("Evaluating RANDOM policy (no checkpoint).")
 

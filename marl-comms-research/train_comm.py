@@ -1,7 +1,10 @@
 """Communication-enabled DQN training script.
 
-Agents jointly select (move, message) each step.
-Received messages from teammates at t-1 are part of the agent's state at t.
+Each agent independently selects a move (via move Q-head) and a message
+(via message Q-head) at every step. Both heads share a CNN trunk and are
+trained with the same TD target. Received messages from teammates at t-1
+are part of each agent's state at t.
+
 All agents share one CommQNet (parameter sharing).
 
 Usage:
@@ -48,11 +51,8 @@ N_AGENTS = 3
 # ---------------------------------------------------------------------------
 
 def zero_messages(vocab_size: int) -> dict[str, np.ndarray]:
-    """Initial message state at episode start: all zeros."""
-    return {
-        agent: np.zeros(vocab_size, dtype=np.float32)
-        for agent in AGENT_IDS
-    }
+    """Zero message state at episode start."""
+    return {agent: np.zeros(vocab_size, dtype=np.float32) for agent in AGENT_IDS}
 
 
 def msg_to_onehot(msg_idx: int, vocab_size: int) -> np.ndarray:
@@ -61,10 +61,7 @@ def msg_to_onehot(msg_idx: int, vocab_size: int) -> np.ndarray:
     return v
 
 
-def build_received(
-    agent: str,
-    prev_messages: dict[str, np.ndarray],
-) -> np.ndarray:
+def build_received(agent: str, prev_messages: dict[str, np.ndarray]) -> np.ndarray:
     """Concatenate all other agents' previous messages for `agent`."""
     others = [m for a, m in sorted(prev_messages.items()) if a != agent]
     return np.concatenate(others, axis=0)
@@ -81,31 +78,36 @@ def select_actions(
     epsilon: float,
     device: torch.device,
 ) -> tuple[dict[str, int], dict[str, int], dict[str, int]]:
-    """Epsilon-greedy joint (move, message) selection.
+    """Epsilon-greedy selection of moves and messages independently.
 
     Returns:
-        joint_actions : {agent: joint_action_idx}
-        move_actions  : {agent: move_idx}
-        msg_actions   : {agent: msg_idx}
+        joint_actions : {agent: move * vocab_size + msg}  (stored in buffer)
+        move_actions  : {agent: move_idx}                 (sent to env)
+        msg_actions   : {agent: msg_idx}                  (sent to teammates)
     """
     joint_actions: dict[str, int] = {}
     move_actions:  dict[str, int] = {}
     msg_actions:   dict[str, int] = {}
 
     for agent, obs in observations.items():
-        if random.random() < epsilon:
-            joint = random.randrange(qnet.n_joint_actions)
+        rand_move = random.random() < epsilon
+        rand_msg  = random.random() < epsilon
+
+        if rand_move and rand_msg:
+            move = random.randrange(qnet.n_move_actions)
+            msg  = random.randrange(qnet.vocab_size)
         else:
             obs_t  = torch.from_numpy(obs.transpose(2, 0, 1)).unsqueeze(0).to(device)
             aid_t  = torch.tensor([AGENT_IDS[agent]], dtype=torch.long, device=device)
-            recv   = build_received(agent, prev_messages)
-            recv_t = torch.from_numpy(recv).unsqueeze(0).to(device)
+            recv_t = torch.from_numpy(
+                build_received(agent, prev_messages)
+            ).unsqueeze(0).to(device)
             with torch.no_grad():
-                q = qnet(obs_t, aid_t, recv_t)
-            joint = int(q.argmax(dim=1).item())
+                move_q, msg_q = qnet(obs_t, aid_t, recv_t)
+            move = random.randrange(qnet.n_move_actions) if rand_move else int(move_q.argmax(dim=1).item())
+            msg  = random.randrange(qnet.vocab_size)     if rand_msg  else int(msg_q.argmax(dim=1).item())
 
-        move, msg = qnet.decode_action(joint)
-        joint_actions[agent] = joint
+        joint_actions[agent] = move * qnet.vocab_size + msg
         move_actions[agent]  = move
         msg_actions[agent]   = msg
 
@@ -117,20 +119,34 @@ def update_target(online: CommQNet, target: CommQNet) -> None:
 
 
 def compute_loss(
-    batch: "CommBatch",
+    batch,
     online: CommQNet,
     target: CommQNet,
     gamma: float,
 ) -> torch.Tensor:
-    q_values = online(batch.obs, batch.agent_ids, batch.received_msgs)
-    q_taken  = q_values.gather(1, batch.actions.unsqueeze(1)).squeeze(1)
+    """DQN loss for move head + message head, sharing one TD target.
+
+    TD target uses the move head's max Q at the next state — moves drive
+    the team reward, so the move head anchors the value estimate for both.
+    """
+    vocab = online.vocab_size
+
+    # Decode stored joint actions into moves and messages
+    move_actions = batch.actions // vocab
+    msg_actions  = batch.actions  % vocab
+
+    move_q_online, msg_q_online = online(batch.obs, batch.agent_ids, batch.received_msgs)
+
+    move_q_taken = move_q_online.gather(1, move_actions.unsqueeze(1)).squeeze(1)
+    msg_q_taken  = msg_q_online.gather(1,  msg_actions.unsqueeze(1)).squeeze(1)
 
     with torch.no_grad():
-        next_q     = target(batch.next_obs, batch.agent_ids, batch.next_received_msgs)
-        next_q_max = next_q.max(dim=1).values
-        td_target  = batch.rewards + gamma * next_q_max * (1.0 - batch.dones)
+        next_move_q, _ = target(batch.next_obs, batch.agent_ids, batch.next_received_msgs)
+        td_target = batch.rewards + gamma * next_move_q.max(dim=1).values * (1.0 - batch.dones)
 
-    return F.mse_loss(q_taken, td_target)
+    move_loss = F.mse_loss(move_q_taken, td_target)
+    msg_loss  = F.mse_loss(msg_q_taken,  td_target)
+    return move_loss + msg_loss
 
 
 # ---------------------------------------------------------------------------
@@ -180,10 +196,7 @@ def train(args: argparse.Namespace) -> None:
 
     total_steps = 0
     episode_log: list[dict] = []
-    # Rolling buffer of message logs for the last msg_log_window episodes.
-    # Only the final window is saved — enough for interpretability without
-    # writing gigabytes of data for every training episode.
-    msg_log_buffer: list[dict] = []   # [{episode, captured, steps: [{agent: msg_idx}]}]
+    msg_log_buffer: list[dict] = []
 
     print(
         f"Training for {args.episodes} episodes on map '{args.map}' | seed {args.seed}\n"
@@ -196,14 +209,13 @@ def train(args: argparse.Namespace) -> None:
         ep_rewards = {a: 0.0 for a in env.possible_agents}
         ep_steps   = 0
         captured   = False
-        msg_log: list[dict[str, int]] = []   # for interpretability later
+        msg_log: list[dict[str, int]] = []
 
         while True:
             joint_actions, move_actions, msg_actions = select_actions(
                 online_net, obs, prev_messages, epsilon, device
             )
 
-            # Build received-message vectors for all agents (before step)
             recv_now = {
                 agent: build_received(agent, prev_messages)
                 for agent in obs
@@ -217,7 +229,6 @@ def train(args: argparse.Namespace) -> None:
                 any(terminations.values()) or any(truncations.values()) or not env.agents
             )
 
-            # New messages sent this step become received at t+1
             new_messages = {
                 agent: msg_to_onehot(msg_actions[agent], args.vocab_size)
                 for agent in joint_actions
@@ -227,10 +238,8 @@ def train(args: argparse.Namespace) -> None:
                 for agent in obs
             }
 
-            # Store transitions
             for agent in rewards:
                 n_ob = next_obs.get(agent, obs[agent])
-                done_agent = terminations.get(agent, False) or truncations.get(agent, False)
                 buffer.push(
                     obs=obs[agent],
                     agent_id=AGENT_IDS[agent],
@@ -251,7 +260,6 @@ def train(args: argparse.Namespace) -> None:
                 if info.get("evaders_remaining", 1) == 0:
                     captured = True
 
-            # Learning step
             if total_steps >= args.warmup_steps and len(buffer) >= args.batch_size:
                 batch = buffer.sample(args.batch_size)
                 loss  = compute_loss(batch, online_net, target_net, args.gamma)
@@ -269,7 +277,6 @@ def train(args: argparse.Namespace) -> None:
             if done_global:
                 break
 
-        # Keep rolling window of message trajectories for interpretability.
         msg_log_buffer.append({
             "episode":  ep,
             "captured": captured,
@@ -281,19 +288,19 @@ def train(args: argparse.Namespace) -> None:
 
         team_reward = sum(ep_rewards.values()) / len(ep_rewards)
         episode_log.append({
-            "episode":      ep,
-            "steps":        ep_steps,
-            "team_reward":  round(team_reward, 4),
-            "captured":     captured,
-            "epsilon":      round(epsilon, 4),
-            "total_steps":  total_steps,
+            "episode":     ep,
+            "steps":       ep_steps,
+            "team_reward": round(team_reward, 4),
+            "captured":    captured,
+            "epsilon":     round(epsilon, 4),
+            "total_steps": total_steps,
         })
 
         if ep % args.log_interval == 0:
-            recent   = episode_log[-args.log_interval:]
-            cap_rate = sum(r["captured"]    for r in recent) / len(recent)
-            avg_steps= sum(r["steps"]       for r in recent) / len(recent)
-            avg_rew  = sum(r["team_reward"] for r in recent) / len(recent)
+            recent    = episode_log[-args.log_interval:]
+            cap_rate  = sum(r["captured"]    for r in recent) / len(recent)
+            avg_steps = sum(r["steps"]       for r in recent) / len(recent)
+            avg_rew   = sum(r["team_reward"] for r in recent) / len(recent)
             print(
                 f"Ep {ep:5d}/{args.episodes} | "
                 f"cap {cap_rate:.2f} | "
@@ -306,12 +313,12 @@ def train(args: argparse.Namespace) -> None:
         if ep % args.save_interval == 0:
             ckpt_path = ckpt_dir / f"comm{args.vocab_size}_ep{ep:06d}.pt"
             torch.save({
-                "episode":        ep,
-                "total_steps":    total_steps,
-                "model_state":    online_net.state_dict(),
-                "optimizer_state":optimizer.state_dict(),
-                "epsilon":        epsilon,
-                "args":           vars(args),
+                "episode":         ep,
+                "total_steps":     total_steps,
+                "model_state":     online_net.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "epsilon":         epsilon,
+                "args":            vars(args),
             }, ckpt_path)
             print(f"  Checkpoint saved → {ckpt_path}")
 
@@ -343,29 +350,27 @@ def train(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Communicating DQN training")
-    p.add_argument("--map",               default="easy_open",
+    p.add_argument("--map",                   default="easy_open",
                    choices=["easy_open", "center_block", "split_barrier"])
-    p.add_argument("--vocab-size",        type=int,   default=4,
+    p.add_argument("--vocab-size",            type=int,   default=4,
                    help="Message vocabulary size (4=2-bit, 16=4-bit)")
-    p.add_argument("--episodes",          type=int,   default=3000)
-    p.add_argument("--seed",              type=int,   default=0)
-    p.add_argument("--lr",                type=float, default=1e-3)
-    p.add_argument("--gamma",             type=float, default=0.99)
-    p.add_argument("--batch-size",        type=int,   default=64)
-    p.add_argument("--buffer-size",       type=int,   default=100_000)
-    p.add_argument("--warmup-steps",      type=int,   default=5_000)
-    p.add_argument("--target-update-freq",type=int,   default=500)
-    p.add_argument("--eps-start",         type=float, default=1.0)
-    p.add_argument("--eps-end",           type=float, default=0.05)
-    p.add_argument("--eps-decay-steps",   type=int,   default=500_000)
-    p.add_argument("--n-catch",           type=int,   default=1,
-                   help="Pursuers required on evader cell (surround=False)")
+    p.add_argument("--episodes",              type=int,   default=5000)
+    p.add_argument("--seed",                  type=int,   default=0)
+    p.add_argument("--lr",                    type=float, default=1e-3)
+    p.add_argument("--gamma",                 type=float, default=0.99)
+    p.add_argument("--batch-size",            type=int,   default=64)
+    p.add_argument("--buffer-size",           type=int,   default=100_000)
+    p.add_argument("--warmup-steps",          type=int,   default=5_000)
+    p.add_argument("--target-update-freq",    type=int,   default=500)
+    p.add_argument("--eps-start",             type=float, default=1.0)
+    p.add_argument("--eps-end",               type=float, default=0.05)
+    p.add_argument("--eps-decay-steps",       type=int,   default=500_000)
+    p.add_argument("--n-catch",               type=int,   default=1)
     p.add_argument("--distance-reward-scale", type=float, default=0.1)
-    p.add_argument("--log-interval",      type=int,   default=100)
-    p.add_argument("--save-interval",     type=int,   default=500)
-    p.add_argument("--msg-log-window",    type=int,   default=500,
-                   help="Number of final training episodes whose message trajectories are saved for interpretability")
-    p.add_argument("--results-dir",       default="results/comm")
+    p.add_argument("--msg-log-window",        type=int,   default=500)
+    p.add_argument("--log-interval",          type=int,   default=100)
+    p.add_argument("--save-interval",         type=int,   default=500)
+    p.add_argument("--results-dir",           default="results/comm")
     return p.parse_args()
 
 

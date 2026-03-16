@@ -1,20 +1,23 @@
-"""Communicating Q-network for discrete emergent communication.
+"""Communicating Q-network with separate move and message heads.
 
 Architecture:
-  - Same CNN backbone as PursuitQNet (obs → 3136 features)
-  - Agent-ID embedding (same as baseline)
+  - CNN backbone (identical to PursuitQNet)
+  - Agent-ID embedding
   - Received-message encoder: (n_agents-1) one-hot vectors → embedding
-  - Head → Q-values over joint (move, message) action space
+  - Shared trunk: combined features → 256 → 128
+  - Move head:    128 → n_move_actions   (trained with DQN)
+  - Message head: 128 → vocab_size       (trained with same TD target)
 
-Joint action space:
-  - Total actions = n_move_actions × vocab_size
-  - action_idx = move_idx * vocab_size + msg_idx
-  - Decode: move = action_idx // vocab_size
-             msg  = action_idx  % vocab_size
+Why separate heads (not joint Q-values):
+  Joint Q(move, message) over vocab_size*5 actions fails in practice because
+  DQN cannot cleanly separate move credit from message credit across a large
+  action space with sparse rewards. Separate heads keep move selection
+  identical in complexity to the baseline (5 Q-values), while the message
+  head learns which symbols are associated with higher future team reward.
 
 Message timing (per specs):
-  - At step t each agent receives the messages its teammates sent at t-1.
-  - At episode start, all received messages are zeros.
+  At step t each agent receives its teammates' messages from step t-1.
+  At episode start all received messages are zero vectors.
 """
 
 from __future__ import annotations
@@ -24,14 +27,14 @@ import torch.nn as nn
 
 
 class CommQNet(nn.Module):
-    """Shared-parameter communicating Q-network.
+    """Shared-parameter communicating Q-network with dual output heads.
 
     Args:
-        n_agents:        number of pursuers (default 3).
-        n_move_actions:  number of movement actions (default 5).
-        vocab_size:      discrete message vocabulary size (4 or 16).
-        agent_emb_dim:   agent-ID embedding dimension.
-        msg_emb_dim:     message encoder output dimension.
+        n_agents:       number of pursuers (default 3).
+        n_move_actions: movement action count (default 5).
+        vocab_size:     discrete message vocabulary size (4 or 16).
+        agent_emb_dim:  agent-ID embedding dimension.
+        msg_emb_dim:    received-message encoder output dimension.
     """
 
     def __init__(
@@ -47,7 +50,6 @@ class CommQNet(nn.Module):
         self.n_agents = n_agents
         self.n_move_actions = n_move_actions
         self.vocab_size = vocab_size
-        self.n_joint_actions = n_move_actions * vocab_size
 
         # CNN — identical to baseline
         self.cnn = nn.Sequential(
@@ -61,43 +63,46 @@ class CommQNet(nn.Module):
 
         self.agent_embedding = nn.Embedding(n_agents, agent_emb_dim)
 
-        # Message encoder: received (n_agents-1) one-hot vectors concatenated
+        # Message encoder: (n_agents-1) one-hot vectors concatenated
         msg_input_dim = (n_agents - 1) * vocab_size
         self.msg_encoder = nn.Sequential(
             nn.Linear(msg_input_dim, msg_emb_dim),
             nn.ReLU(),
         )
 
-        self.head = nn.Sequential(
-            nn.Linear(cnn_out_dim + agent_emb_dim + msg_emb_dim, 256),
+        # Shared trunk
+        trunk_in = cnn_out_dim + agent_emb_dim + msg_emb_dim
+        self.trunk = nn.Sequential(
+            nn.Linear(trunk_in, 256),
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Linear(128, self.n_joint_actions),
         )
+
+        # Independent output heads
+        self.move_head = nn.Linear(128, n_move_actions)
+        self.msg_head  = nn.Linear(128, vocab_size)
 
     def forward(
         self,
         obs: torch.Tensor,
         agent_ids: torch.Tensor,
         received_msgs: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute Q-values over joint (move, message) actions.
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute move and message Q-values.
 
         Args:
             obs:           (B, 3, 7, 7) float32
-            agent_ids:     (B,) long — values in {0, …, n_agents-1}
+            agent_ids:     (B,) long
             received_msgs: (B, (n_agents-1) * vocab_size) float32 — one-hot
 
         Returns:
-            Q-values of shape (B, n_move_actions * vocab_size)
+            move_q: (B, n_move_actions)
+            msg_q:  (B, vocab_size)
         """
-        cnn_feat = self.cnn(obs)                         # (B, 3136)
-        agent_emb = self.agent_embedding(agent_ids)      # (B, agent_emb_dim)
-        msg_emb = self.msg_encoder(received_msgs)        # (B, msg_emb_dim)
-        combined = torch.cat([cnn_feat, agent_emb, msg_emb], dim=1)
-        return self.head(combined)                       # (B, n_joint_actions)
-
-    def decode_action(self, joint_action: int) -> tuple[int, int]:
-        """Split a joint action index into (move, message) indices."""
-        return divmod(joint_action, self.vocab_size)
+        cnn_feat  = self.cnn(obs)
+        agent_emb = self.agent_embedding(agent_ids)
+        msg_emb   = self.msg_encoder(received_msgs)
+        combined  = torch.cat([cnn_feat, agent_emb, msg_emb], dim=1)
+        trunk_out = self.trunk(combined)
+        return self.move_head(trunk_out), self.msg_head(trunk_out)
