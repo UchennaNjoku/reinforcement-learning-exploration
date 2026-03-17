@@ -230,6 +230,10 @@ The original comm model used a single Q-head over `5 × vocab_size` joint action
 
 The first training attempts without shaped rewards (capture-only reward) produced flat learning curves at 0-4% capture for the entire 5000 episodes. The distance penalty (`scale=0.1`, normalized Manhattan distance to prey) provided a dense gradient signal. This is standard practice in sparse-reward MARL and does not affect the validity of condition comparisons — all conditions used the same reward structure.
 
+### 4.9 Rollout Behavior: Containment at Chokepoints
+
+The rollout visualizations show a recurring behavior on obstacle maps that can look like the agents are "waiting" near a corridor or bottleneck. In successful episodes this is usually not a bug or frozen policy. Instead, the team often appears to hold blocking positions at chokepoints, restricting the prey's escape routes and only advancing once the prey commits to a lane. The safest interpretation is that the learned policy sometimes prefers **containment** over constant direct pursuit.
+
 ---
 
 ## 5. What Is Still To Do
@@ -243,8 +247,12 @@ The first training attempts without shaped rewards (capture-only reward) produce
   - [x] Temporal analysis (episode phase shifts)
   - [x] Role differentiation (per-agent symbol heatmap)
   - [x] Capture/escape correlation — not computable; null result documented and gated
-- [ ] Training curve plots for all conditions overlaid (`plot_comm_training.py` built, not yet run)
-- [ ] Rollout visualization / GIF export showing comm agents coordinating
+- [x] Training curve plots for all conditions overlaid (`results/comm_training_curves.png`)
+- [x] Rollout visualization / GIF export showing comm agents coordinating
+  - [x] `results/rollout_baseline_easy.gif`
+  - [x] `results/rollout_comm4_easy.gif`
+  - [x] `results/rollout_comm16_easy.gif`
+  - [x] `results/rollout_comm16_center.gif`
 
 ### 5.2 Optional but Strengthening
 
