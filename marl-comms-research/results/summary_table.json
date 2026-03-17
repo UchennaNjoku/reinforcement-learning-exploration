@@ -1,0 +1,83 @@
+{
+  "('No-Comm', 'easy_open')": {
+    "n": 3,
+    "capture_rate_mean": 0.6783,
+    "capture_rate_std": 0.4549,
+    "avg_steps_mean": 107.5867,
+    "avg_steps_std": 134.2834,
+    "collision_rate_mean": 0.0047,
+    "collision_rate_std": 0.0054
+  },
+  "('No-Comm', 'center_block')": {
+    "n": 3,
+    "capture_rate_mean": 0.4917,
+    "capture_rate_std": 0.3714,
+    "avg_steps_mean": 194.85,
+    "avg_steps_std": 109.929,
+    "collision_rate_mean": 0.1263,
+    "collision_rate_std": 0.157
+  },
+  "('No-Comm', 'split_barrier')": {
+    "n": 3,
+    "capture_rate_mean": 0.4867,
+    "capture_rate_std": 0.3681,
+    "avg_steps_mean": 199.4067,
+    "avg_steps_std": 99.2437,
+    "collision_rate_mean": 0.241,
+    "collision_rate_std": 0.0619
+  },
+  "('Comm-4', 'easy_open')": {
+    "n": 3,
+    "capture_rate_mean": 1.0,
+    "capture_rate_std": 0.0,
+    "avg_steps_mean": 9.87,
+    "avg_steps_std": 0.3051,
+    "collision_rate_mean": 0.0083,
+    "collision_rate_std": 0.0107
+  },
+  "('Comm-4', 'center_block')": {
+    "n": 3,
+    "capture_rate_mean": 0.91,
+    "capture_rate_std": 0.1273,
+    "avg_steps_mean": 73.5633,
+    "avg_steps_std": 70.1198,
+    "collision_rate_mean": 0.1433,
+    "collision_rate_std": 0.1222
+  },
+  "('Comm-4', 'split_barrier')": {
+    "n": 3,
+    "capture_rate_mean": 0.8867,
+    "capture_rate_std": 0.0741,
+    "avg_steps_mean": 101.6467,
+    "avg_steps_std": 48.4902,
+    "collision_rate_mean": 0.1765,
+    "collision_rate_std": 0.0935
+  },
+  "('Comm-16', 'easy_open')": {
+    "n": 3,
+    "capture_rate_mean": 1.0,
+    "capture_rate_std": 0.0,
+    "avg_steps_mean": 9.6567,
+    "avg_steps_std": 1.051,
+    "collision_rate_mean": 0.0026,
+    "collision_rate_std": 0.0034
+  },
+  "('Comm-16', 'center_block')": {
+    "n": 3,
+    "capture_rate_mean": 0.8867,
+    "capture_rate_std": 0.1603,
+    "avg_steps_mean": 79.7167,
+    "avg_steps_std": 63.8876,
+    "collision_rate_mean": 0.0069,
+    "collision_rate_std": 0.0088
+  },
+  "('Comm-16', 'split_barrier')": {
+    "n": 3,
+    "capture_rate_mean": 0.7833,
+    "capture_rate_std": 0.1511,
+    "avg_steps_mean": 161.69,
+    "avg_steps_std": 38.1503,
+    "collision_rate_mean": 0.1109,
+    "collision_rate_std": 0.1273
+  }
+}

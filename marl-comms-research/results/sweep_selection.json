@@ -1,0 +1,560 @@
+[
+  {
+    "condition": "No-Comm",
+    "subdir": "baseline_v3",
+    "seed": 0,
+    "vocab": null,
+    "selected_ckpt": "results/baseline_v3/checkpoints/baseline_ep004000.pt",
+    "selected_ep": 4000,
+    "selected_cap": 1.0,
+    "selected_steps": 9.08,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.245,
+        "avg_steps": 267.32
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 0.055,
+        "avg_steps": 293.32
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 0.22,
+        "avg_steps": 271.75
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 0.255,
+        "avg_steps": 265.09
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 0.125,
+        "avg_steps": 285.17
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 0.42,
+        "avg_steps": 233.03
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 0.775,
+        "avg_steps": 159.54
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.08
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 15.3
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 14.49
+      }
+    ]
+  },
+  {
+    "condition": "No-Comm",
+    "subdir": "baseline_s1",
+    "seed": 1,
+    "vocab": null,
+    "selected_ckpt": "results/baseline_s1/checkpoints/baseline_ep005000.pt",
+    "selected_ep": 5000,
+    "selected_cap": 1.0,
+    "selected_steps": 10.79,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.605,
+        "avg_steps": 201.06
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 0.585,
+        "avg_steps": 194.44
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 0.575,
+        "avg_steps": 195.41
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 0.64,
+        "avg_steps": 166.15
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 0.805,
+        "avg_steps": 99.41
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 0.69,
+        "avg_steps": 193.59
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 0.405,
+        "avg_steps": 242.6
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 0.93,
+        "avg_steps": 46.8
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 0.995,
+        "avg_steps": 11.15
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.79
+      }
+    ]
+  },
+  {
+    "condition": "Comm-4",
+    "subdir": "comm4_v2",
+    "seed": 0,
+    "vocab": 4,
+    "selected_ckpt": "results/comm4_v2/checkpoints/comm4_ep004000.pt",
+    "selected_ep": 4000,
+    "selected_cap": 1.0,
+    "selected_steps": 9.28,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.995,
+        "avg_steps": 21.59
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 1.0,
+        "avg_steps": 15.39
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 1.0,
+        "avg_steps": 10.76
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 0.995,
+        "avg_steps": 14.91
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.75
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.36
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 13.74
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.28
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 12.29
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.47
+      }
+    ]
+  },
+  {
+    "condition": "Comm-4",
+    "subdir": "comm4_s1",
+    "seed": 1,
+    "vocab": 4,
+    "selected_ckpt": "results/comm4_s1/checkpoints/comm4_ep003500.pt",
+    "selected_ep": 3500,
+    "selected_cap": 1.0,
+    "selected_steps": 10.07,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.265,
+        "avg_steps": 268.79
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 0.895,
+        "avg_steps": 81.47
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 1.0,
+        "avg_steps": 25.38
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 0.995,
+        "avg_steps": 15.02
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 10.61
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 13.82
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 10.07
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.13
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 12.6
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.21
+      }
+    ]
+  },
+  {
+    "condition": "Comm-4",
+    "subdir": "comm4_s2",
+    "seed": 2,
+    "vocab": 4,
+    "selected_ckpt": "results/comm4_s2/checkpoints/comm4_ep001500.pt",
+    "selected_ep": 1500,
+    "selected_cap": 1.0,
+    "selected_steps": 9.82,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.98,
+        "avg_steps": 22.01
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 1.0,
+        "avg_steps": 12.09
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.82
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 0.985,
+        "avg_steps": 27.57
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 11.86
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 11.45
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 10.03
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.01
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 16.02
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.93
+      }
+    ]
+  },
+  {
+    "condition": "Comm-16",
+    "subdir": "comm16_v2",
+    "seed": 0,
+    "vocab": 16,
+    "selected_ckpt": "results/comm16_v2/checkpoints/comm16_ep003500.pt",
+    "selected_ep": 3500,
+    "selected_cap": 1.0,
+    "selected_steps": 9.32,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 1.0,
+        "avg_steps": 44.8
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 1.0,
+        "avg_steps": 14.4
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 1.0,
+        "avg_steps": 14.26
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 1.0,
+        "avg_steps": 16.29
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 10.79
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.71
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.32
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 11.16
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 12.2
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 11.13
+      }
+    ]
+  },
+  {
+    "condition": "Comm-16",
+    "subdir": "comm16_s1",
+    "seed": 1,
+    "vocab": 16,
+    "selected_ckpt": "results/comm16_s1/checkpoints/comm16_ep004500.pt",
+    "selected_ep": 4500,
+    "selected_cap": 1.0,
+    "selected_steps": 8.91,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.605,
+        "avg_steps": 191.69
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 0.99,
+        "avg_steps": 35.59
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.18
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 1.0,
+        "avg_steps": 16.06
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.42
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.46
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 8.97
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.84
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 8.91
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.09
+      }
+    ]
+  },
+  {
+    "condition": "Comm-16",
+    "subdir": "comm16_s2",
+    "seed": 2,
+    "vocab": 16,
+    "selected_ckpt": "results/comm16_s2/checkpoints/comm16_ep004000.pt",
+    "selected_ep": 4000,
+    "selected_cap": 1.0,
+    "selected_steps": 8.75,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.655,
+        "avg_steps": 171.89
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 0.935,
+        "avg_steps": 97.17
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 1.0,
+        "avg_steps": 11.97
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.62
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.8
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.16
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 8.95
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 8.75
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 10.34
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 8.75
+      }
+    ]
+  },
+  {
+    "condition": "No-Comm",
+    "subdir": "baseline_s3",
+    "seed": 3,
+    "vocab": null,
+    "selected_ckpt": "results/baseline_s3/checkpoints/baseline_ep005000.pt",
+    "selected_ep": 5000,
+    "selected_cap": 1.0,
+    "selected_steps": 8.82,
+    "all_scores": [
+      {
+        "ep": 500,
+        "capture_rate": 0.27,
+        "avg_steps": 257.7
+      },
+      {
+        "ep": 1000,
+        "capture_rate": 0.245,
+        "avg_steps": 263.04
+      },
+      {
+        "ep": 1500,
+        "capture_rate": 0.385,
+        "avg_steps": 226.0
+      },
+      {
+        "ep": 2000,
+        "capture_rate": 0.995,
+        "avg_steps": 15.04
+      },
+      {
+        "ep": 2500,
+        "capture_rate": 1.0,
+        "avg_steps": 8.98
+      },
+      {
+        "ep": 3000,
+        "capture_rate": 1.0,
+        "avg_steps": 10.24
+      },
+      {
+        "ep": 3500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.24
+      },
+      {
+        "ep": 4000,
+        "capture_rate": 1.0,
+        "avg_steps": 9.99
+      },
+      {
+        "ep": 4500,
+        "capture_rate": 1.0,
+        "avg_steps": 9.11
+      },
+      {
+        "ep": 5000,
+        "capture_rate": 1.0,
+        "avg_steps": 8.82
+      }
+    ]
+  }
+]
