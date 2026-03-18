@@ -49,6 +49,24 @@ def _with_central_block(size: int, start: int, end: int) -> np.ndarray:
     return grid
 
 
+def _with_double_barrier(
+    size: int,
+    x1: int,
+    x2: int,
+    blocked_rows: range,
+    gap1_rows: tuple[int, ...],
+    gap2_rows: tuple[int, ...],
+) -> np.ndarray:
+    """Two vertical barriers with staggered gaps, creating three rooms."""
+    grid = _empty_map(size)
+    for y in blocked_rows:
+        if y not in gap1_rows:
+            grid[x1, y] = -1
+        if y not in gap2_rows:
+            grid[x2, y] = -1
+    return grid
+
+
 MAP_SPECS: dict[str, MapSpec] = {
     "easy_open": MapSpec(
         name="easy_open",
@@ -72,6 +90,22 @@ MAP_SPECS: dict[str, MapSpec] = {
         ),
         pursuer_starts=((2, 4), (2, 11), (4, 8)),
         evader_starts=((13, 8),),
+    ),
+    # 20x20 stress-test: same single-barrier structure as split_barrier but
+    # on a larger grid. Isolates map size as the only new variable.
+    # Barrier at x=10, two gaps at y=5 and y=14 (mirroring split_barrier spacing).
+    # With obs_range=7 (±3 cells), left-room agents can't see the barrier or
+    # the evader — same partial observability pressure as split_barrier but harder.
+    "large_split": MapSpec(
+        name="large_split",
+        grid=_with_vertical_barrier(
+            size=20,
+            x=10,
+            blocked_rows=range(2, 18),
+            gap_rows=(5, 14),
+        ),
+        pursuer_starts=((2, 4), (2, 10), (2, 16)),
+        evader_starts=((17, 10),),
     ),
 }
 

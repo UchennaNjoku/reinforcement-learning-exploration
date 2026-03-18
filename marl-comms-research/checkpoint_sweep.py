@@ -57,7 +57,7 @@ SEED_MAP = {
     "comm16_v2":   0, "comm16_s1":   1, "comm16_s2":   2,
 }
 
-MAPS = ["easy_open", "center_block", "split_barrier"]
+MAPS = ["easy_open", "center_block", "split_barrier", "large_split"]
 METRICS = ["capture_rate", "avg_steps", "collision_rate"]
 
 

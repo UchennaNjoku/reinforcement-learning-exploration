@@ -1,0 +1,11 @@
+{
+  "map": "large_corridor",
+  "episodes": 200,
+  "seed": 99,
+  "policy": "comm16",
+  "capture_rate": 0.065,
+  "escape_rate": 0.935,
+  "avg_steps": 294.58,
+  "avg_steps_capture": 216.69,
+  "collision_rate": 0.2916
+}

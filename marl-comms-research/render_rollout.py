@@ -203,7 +203,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--checkpoint", required=True,
                    help="Path to .pt checkpoint")
     p.add_argument("--map",        default=None,
-                   choices=["easy_open", "center_block", "split_barrier"],
+                   choices=["easy_open", "center_block", "split_barrier", "large_split"],
                    help="Map to render on (default: checkpoint's training map)")
     p.add_argument("--seed",       type=int, default=99)
     p.add_argument("--fps",        type=int, default=8,

@@ -262,7 +262,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--random-policy", action="store_true",
                    help="Use random actions (no checkpoint needed)")
     p.add_argument("--map",           default=None,
-                   choices=["easy_open", "center_block", "split_barrier"],
+                   choices=["easy_open", "center_block", "split_barrier", "large_split"],
                    help="Map to evaluate on. Defaults to checkpoint's training map.")
     p.add_argument("--episodes",      type=int, default=50)
     p.add_argument("--seed",          type=int, default=42)
