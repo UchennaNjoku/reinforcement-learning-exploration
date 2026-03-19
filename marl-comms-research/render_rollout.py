@@ -191,7 +191,7 @@ def save_gif(frames: list, out_path: Path, fps: int) -> None:
         duration=duration_ms,
         loop=0,
     )
-    print(f"GIF saved → {out_path}  ({len(frames)} frames @ {fps} fps)")
+    print(f"GIF saved -> {out_path}  ({len(frames)} frames @ {fps} fps)")
 
 
 # ---------------------------------------------------------------------------
@@ -206,12 +206,31 @@ def parse_args() -> argparse.Namespace:
                    choices=["easy_open", "center_block", "split_barrier", "large_split"],
                    help="Map to render on (default: checkpoint's training map)")
     p.add_argument("--seed",       type=int, default=99)
-    p.add_argument("--fps",        type=int, default=8,
+    p.add_argument("--fps",        type=int, default=6,
                    help="Frames per second in output GIF")
     p.add_argument("--max-steps",  type=int, default=300)
     p.add_argument("--out",        default=None,
                    help="Output GIF path (default: auto-named in results/)")
+    p.add_argument("--best-of",    type=int, default=1,
+                   help="Run N episodes and save the best (fewest steps, captured only). "
+                        "Seeds are tried sequentially starting from --seed.")
+    p.add_argument("--pick",       default="best", choices=["best", "worst"],
+                   help="'best' = fewest steps (captured only). "
+                        "'worst' = failed capture preferred, else most steps. "
+                        "Use 'worst' to show a bad no-comm episode for comparison slides.")
     return p.parse_args()
+
+
+def _episode_score(info: dict, pick: str) -> tuple:
+    """Return a sortable key. Lower = preferred for the chosen pick mode."""
+    captured = info["captured"]
+    steps    = info["steps"]
+    if pick == "best":
+        # Prefer captured, then fewest steps
+        return (0 if captured else 1, steps)
+    else:  # worst
+        # Prefer not captured, then most steps
+        return (0 if not captured else 1, -steps)
 
 
 if __name__ == "__main__":
@@ -223,17 +242,32 @@ if __name__ == "__main__":
     else:
         stem = ckpt_path.parent.parent.name  # e.g. comm4_v2
         map_tag = args.map or "default_map"
-        out_path = Path("results") / f"rollout_{stem}_{map_tag}.gif"
+        pick_tag = f"_{args.pick}" if args.pick == "worst" else ""
+        out_path = Path("results") / f"rollout_{stem}_{map_tag}{pick_tag}.gif"
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Running rollout: {ckpt_path.name}")
-    frames, info = run_rollout(
-        checkpoint_path=str(ckpt_path),
-        map_name=args.map,
-        seed=args.seed,
-        max_steps=args.max_steps,
-    )
+    n = max(args.best_of, 1)
+    print(f"Running rollout: {ckpt_path.name}  (pick={args.pick}, n={n})")
 
-    print(f"Episode: captured={info['captured']}, steps={info['steps']}, map={info['map']}")
-    save_gif(frames, out_path, fps=args.fps)
+    candidates = []
+
+    for attempt in range(n):
+        seed = args.seed + attempt
+        frames, info = run_rollout(
+            checkpoint_path=str(ckpt_path),
+            map_name=args.map,
+            seed=seed,
+            max_steps=args.max_steps,
+        )
+        info["seed"] = seed
+        info["frames"] = frames
+        candidates.append(info)
+        print(f"  attempt {attempt+1}/{n}  seed={seed}  captured={info['captured']}  steps={info['steps']}")
+
+    candidates.sort(key=lambda x: _episode_score(x, args.pick))
+    chosen = candidates[0]
+
+    print(f"\nChosen episode: seed={chosen['seed']}  captured={chosen['captured']}  "
+          f"steps={chosen['steps']}  map={chosen['map']}")
+    save_gif(chosen["frames"], out_path, fps=args.fps)

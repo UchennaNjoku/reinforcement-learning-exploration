@@ -1,0 +1,40 @@
+# EPyMARL environment config for pursuit_v4 with surround=True
+# Place this file at: epymarl/src/config/envs/pursuit_surround.yaml
+# Then run: python src/main.py --config=ippo --env-config=pursuit_surround
+
+env: "pettingzoo"
+
+env_args:
+  key: "sisl.pursuit_v4"          # module path inside pettingzoo
+
+  # Grid
+  x_size: 16
+  y_size: 16
+
+  # Agent counts
+  n_pursuers: 8
+  n_evaders: 30
+
+  # Observation
+  obs_range: 7                    # 7x7 local window, same as your current project
+
+  # Capture mechanics — THE KEY CHANGE
+  surround: true                  # must encircle on all 4 sides
+  n_catch: 2                      # min pursuers adjacent to count as surrounding
+  freeze_evaders: false           # evaders keep moving
+
+  # Rewards
+  shared_reward: true             # required for value-decomp methods (QMIX/VDN)
+                                  # also helps IPPO by giving all agents the same signal
+  tag_reward: 0.01                # small reward per step of being adjacent to evader
+  catch_reward: 5.0               # reward on successful encirclement/capture
+  urgency_reward: -0.1            # per-step penalty to encourage speed
+
+  # Episode length
+  max_cycles: 500
+
+  # Rendering (disable for training speed)
+  render_mode: null
+
+# How many agents (must match n_pursuers above — EPyMARL needs this)
+agent_count: 8
