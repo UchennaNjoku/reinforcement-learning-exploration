@@ -36,7 +36,7 @@ def run(cmd, **kwargs):
 print("=" * 60)
 print("STEP 1 — Installing dependencies")
 print("=" * 60)
-run("pip install -q pettingzoo[sisl]==1.24.3 sacred pymongo==3.12.3 pygame")
+run("pip install -q 'pettingzoo[sisl]' sacred pymongo pygame")
 
 # ── Step 2: Clone EPyMARL ───────────────────────────────────────────────────
 print("\n" + "=" * 60)
