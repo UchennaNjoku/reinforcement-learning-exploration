@@ -227,26 +227,51 @@ Draw the 16×16 grid. Place an agent in the center. Shade the 7×7 window around
 **Title:** How the agents learn — Deep Q-Learning with parameter sharing
 
 **CREATE — Visual B (architecture diagram):**
-This slide really needs a diagram. Draw the following flow:
+This slide really needs a diagram. Draw the following flow exactly as the code works:
 
 ```
-[7×7×3 observation]
-        ↓
-  [CNN backbone]
-        ↓
-[3136 features]  +  [agent ID embedding (8-dim)]  +  [received messages (16-dim, comm only)]
-        ↓
-   [FC 256 → 128]
-        ↓
-[Move head: 5 Q-values]     [Message head: vocab Q-values]  ← comm only
+         BASELINE (No-Comm)                    COMM MODEL (Comm-4 / Comm-16)
+
+   [7×7×3 local observation]             [7×7×3 local observation]
+              ↓                                        ↓
+   [Conv2d 3→32, 3×3, pad=1]             [Conv2d 3→32, 3×3, pad=1]
+              ↓  ReLU                                  ↓  ReLU
+   [Conv2d 32→64, 3×3, pad=1]            [Conv2d 32→64, 3×3, pad=1]
+              ↓  ReLU                                  ↓  ReLU
+          [Flatten]                               [Flatten]
+              ↓                                        ↓
+       [3136 features]                         [3136 features]
+              +                                        +
+  [Agent ID embedding (8-dim)]          [Agent ID embedding (8-dim)]
+              ↓                                        +
+      concat → 3144-dim                [2 teammate msgs (one-hot, 2×vocab_size)]
+              ↓                                        ↓  Linear+ReLU
+   [Linear 3144 → 256]  ReLU              [Message encoder → 16-dim]
+              ↓                                        ↓
+   [Linear 256 → 128]   ReLU          concat → 3160-dim (3136+8+16)
+              ↓                                        ↓
+   [Linear 128 → 5]                     [Linear 3160 → 256]  ReLU
+              ↓                                        ↓
+     [5 Q-values]                        [Linear 256 → 128]   ReLU
+   (move actions)                                      ↓
+                                          ┌────────────┴────────────┐
+                                          ↓                         ↓
+                                 [Linear 128 → 5]        [Linear 128 → vocab_size]
+                                          ↓                         ↓
+                                   [Move Q-values]       [Message Q-values]
+                                   (5 move actions)      (4 or 16 symbols)
 ```
 
-Use a simple box-and-arrow style. Color the message path differently (blue) from the baseline path (grey). This visual immediately shows the dual-head design and why it matters.
+Use a simple box-and-arrow style. Color the message path blue, baseline grey.
+For the presentation you only need to show the COMM MODEL side — the baseline is the same thing minus the blue message path.
 
 **If you don't create the diagram, use bullets:**
-- CNN reads each agent's 7×7 local observation
-- FC layers estimate Q-values for each action
-- Comm agents: separate heads for movement (5 actions) and outgoing message (4 or 16 options)
+- CNN: two convolutional layers (3→32→64 channels, 3×3 kernels) process the 7×7 observation → 3136 features
+- Agent ID embedding (8-dim) is concatenated so one shared network can serve all 3 pursuers
+- Comm agents also receive 2 teammates' previous messages as one-hot vectors → encoded to 16-dim
+- All three inputs concatenated → two FC layers (256 → 128) → dual output heads
+- Move head: 5 Q-values (up/down/left/right/stay)
+- Message head: vocab_size Q-values (which symbol to broadcast)
 - Parameter sharing: all 3 pursuers use the same model weights
 - Messages from step *t* arrive at teammates at step *t+1*
 
@@ -257,11 +282,13 @@ Use a simple box-and-arrow style. Color the message path differently (blue) from
 
 "I used deep Q-learning — a method where a neural network learns to estimate which actions lead to better long-term outcomes, trained through trial and error."
 
-"All three pursuers share one set of model weights. That is called parameter sharing. Rather than three separate models each learning from their own limited experience, they all learn from pooled experience. The agent's index tells the model which pursuer it is acting as."
+"All three pursuers share one set of model weights — that is called parameter sharing. Rather than three separate models each learning from scratch, they all learn from pooled experience. The agent's index is passed as an embedding so one network can serve all three pursuers with different behavior."
 
-"The key architectural decision in the communication models was to use two separate output heads — one for movement, one for the outgoing message symbol. Early experiments tried a joint action space over movement and message combined. That failed: the network could not cleanly assign credit across the expanded action space when rewards are sparse. Separating the heads kept movement learning identical in complexity to the baseline."
+"The network first processes each agent's 7 by 7 local observation through two convolutional layers. This extracts spatial features — things like where the prey is relative to the agent, and what cells are occupied. Those features are then flattened and combined with the agent ID embedding, before passing through two fully connected layers down to the Q-value outputs."
 
-"In the communication conditions, each agent's input includes the messages its two teammates sent at the previous timestep. Communication is end-to-end trained — the agents learn when and what to say by learning what helps win the task."
+"In the communication conditions, each agent also receives the messages its two teammates sent at the previous timestep — encoded and concatenated before the fully connected layers. This is the only additional input."
+
+"The key architectural decision was to use two separate output heads — one for movement, one for the outgoing message. Early experiments used a joint action space combining both. That failed because DQN cannot cleanly separate movement credit from message credit when rewards are sparse. Separate heads keep movement learning identical in complexity to the baseline."
 
 ---
 
